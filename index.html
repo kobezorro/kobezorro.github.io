@@ -66,6 +66,9 @@
         return;
       }
 
+      canvasElement.width = results.image.width;
+      canvasElement.height = results.image.height;
+
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       // canvasCtx.drawImage(results.segmentationMask, 0, 0,
