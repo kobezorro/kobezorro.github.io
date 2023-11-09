@@ -1,67 +1,123 @@
 <!DOCTYPE html>
-<!--
- *  Copyright (c) 2015 The WebRTC project authors. All Rights Reserved.
- *
- *  Use of this source code is governed by a BSD-style license
- *  that can be found in the LICENSE file in the root of the source
- *  tree.
--->
 <html>
-<head>
-
+    <head>
     <meta charset="utf-8">
-    <meta name="description" content="WebRTC code samples">
-    <meta name="viewport" content="width=device-width, user-scalable=yes, initial-scale=1, maximum-scale=1">
-    <meta itemprop="description" content="Client-side WebRTC code samples">
-    <meta itemprop="image" content="../../../images/webrtc-icon-192x192.png">
-    <meta itemprop="name" content="WebRTC code samples">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta id="theme-color" name="theme-color" content="#ffffff">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils_3d/control_utils_3d.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    </head>
 
-    <base target="_blank">
+    <body>
+    <div class="container">
+        <video controls="controls" src="" id="video" class="input_video"
+            x5-video-player-type="h5"
+            preload="metadata"
+            playsinline="true"
+            webkit-playsinline="true"
+            x-webkit-airplay="true"
+            x5-video-orientation="portraint"
+            x5-video-player-fullscreen="true">
+        </video>
+        <canvas class="output_canvas" width="1280px" height="720px"></canvas>
+        <div class="landmark-grid-container"></div>
+    </div>
+    </body>
 
-    <title>getUserMedia to canvas</title>
+    <style>
+        .input_video {
+            transform: scale(-1, 1);
+        }
 
-    <link rel="icon" sizes="192x192" href="../../../images/webrtc-icon-192x192.png">
-    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700" rel="stylesheet" type="text/css">
-    <link rel="stylesheet" href="css/main.css">
+        .output_canvas {
+            transform: scale(-1, 1);
+        }
 
-</head>
+        .landmark-grid-container {
+            height: 1200px;
+        }
+    </style>
 
-<body>
-
-<div id="container">
-
-    <h1><a href="//webrtc.github.io/samples/" title="WebRTC samples homepage">WebRTC samples</a> <span>getUserMedia ⇒ canvas</span>
-    </h1>
-
-    <!-- <video playsinline autoplay></video> -->
-    <video controls="controls" src="" id="video"
-        x5-video-player-type="h5"
-        preload="metadata"
-        playsinline="true"
-        webkit-playsinline="true"
-        x-webkit-airplay="true"
-        x5-video-orientation="portraint"
-        x5-video-player-fullscreen="true">
-    </video>
-    <button>Take snapshot</button>
-    <canvas></canvas>
-
-    <p>Draw a frame from the video onto the canvas element using the <code>drawImage()</code> method.</p>
-
-    <p>The variables <code>canvas</code>, <code>video</code> and <code>stream</code> are in global scope, so you can
-        inspect them from the console.</p>
-
-    <a href="https://github.com/webrtc/samples/tree/gh-pages/src/content/getusermedia/canvas"
-       title="View source for this page on GitHub" id="viewSource">View source on GitHub</a>
-
-</div>
-
-<script src="http://res.wx.qq.com/open/js/jweixin-1.4.0.js"></script>
-<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
-<script src="js/main.js" async></script>
-<script src="js/lib/ga.js"></script>
-
-</body>
+    <script src="http://res.wx.qq.com/open/js/jweixin-1.4.0.js"></script>
+    <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
 </html>
+
+<script type="module">
+    const videoElement = document.getElementsByClassName('input_video')[0];
+    const canvasElement = document.getElementsByClassName('output_canvas')[0];
+    const canvasCtx = canvasElement.getContext('2d');
+    const landmarkContainer = document.getElementsByClassName('landmark-grid-container')[0];
+    const grid = new LandmarkGrid(landmarkContainer, {
+        connectionColor: 0xCCCCCC,
+        definedColors: [{ name: 'LEFT', value: 0xffa500 }, { name: 'RIGHT', value: 0x00ffff }],
+        range: 2,
+        fitToGrid: true,
+        labelSuffix: 'm',
+        landmarkSize: 2,
+        numCellsPerAxis: 4,
+        showHidden: true,
+        centered: true,
+    });
+
+    function onResults(results) {
+      if (!results.poseLandmarks) {
+        grid.updateLandmarks([]);
+        return;
+      }
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      // canvasCtx.drawImage(results.segmentationMask, 0, 0,
+      //                     canvasElement.width, canvasElement.height);
+
+      // Only overwrite existing pixels.
+      canvasCtx.globalCompositeOperation = 'source-in';
+      canvasCtx.fillStyle = '#00FF00';
+      canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+
+      // Only overwrite missing pixels.
+      canvasCtx.globalCompositeOperation = 'destination-atop';
+      canvasCtx.drawImage(
+          results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+      canvasCtx.globalCompositeOperation = 'source-over';
+      drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS,
+                     {color: '#00FF00', lineWidth: 4});
+      drawLandmarks(canvasCtx, results.poseLandmarks,
+                    {color: '#FF0000', lineWidth: 2});
+      canvasCtx.restore();
+
+      // grid.updateLandmarks(results.poseWorldLandmarks);
+      grid.updateLandmarks(results.poseWorldLandmarks, POSE_CONNECTIONS, [
+            { list: Object.values(POSE_LANDMARKS_LEFT), color: 'LEFT' },
+            { list: Object.values(POSE_LANDMARKS_RIGHT), color: 'RIGHT' },
+        ]);
+    }
+
+    document.addEventListener("WeixinJSBridgeReady", function () {
+      videoElement.play();
+    }, false);
+
+    const pose = new Pose({locateFile: (file) => {
+      return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+    }});
+    pose.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      enableSegmentation: true,
+      smoothSegmentation: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+    pose.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await pose.send({image: videoElement});
+      },
+      width: 1280,
+      height: 720
+    });
+    camera.start();
+</script>
